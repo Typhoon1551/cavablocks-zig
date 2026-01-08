@@ -1,27 +1,38 @@
 const std = @import("std");
-const cavablocks_zig = @import("cavablocks_zig");
+const lib = @import("cavablocks_zig");
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try cavablocks_zig.bufferedPrint();
-}
+    // Memory Allocator
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-test "simple test" {
-    const gpa = std.testing.allocator;
-    var list: std.ArrayList(i32) = .empty;
-    defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(gpa, 42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
+    // Configuration
+    const width: usize = 20;
+    // const framerate = 60;
+    const config_path = "config";
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+    // Stdout
+
+    // Child Process Handling
+    var child = std.process.Child.init(&[_][]const u8{ "cava", "-p", config_path }, alloc);
+    child.stdout_behavior = .Pipe;
+    child.stdin_behavior = .Ignore;
+    child.stderr_behavior = .Inherit;
+
+    try child.spawn();
+
+    var child_reader_buffer: [4096]u8 = undefined;
+    var child_output_buffer: [width]u8 = undefined;
+
+    var child_stdout_reader = child.stdout.?.reader(&child_reader_buffer);
+    const child_stdout_reader_interface = &child_stdout_reader.interface;
+
+    while (true) {
+        const bytes_read = child_stdout_reader_interface.readSliceShort(&child_output_buffer) catch break;
+
+        std.debug.print("{} bytes read\n", .{bytes_read});
+    }
+
+    _ = try child.wait();
 }

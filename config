@@ -1,0 +1,8 @@
+[general]
+framerate = 60
+bars = 20
+[output]
+method = raw
+data_format = binary
+bit_format = 8bit
+channels = mono
