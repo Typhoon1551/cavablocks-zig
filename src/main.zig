@@ -13,6 +13,9 @@ pub fn main() !void {
     const config_path = "config";
 
     // Stdout
+    var stdout_buffer: [256]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout_writer = &stdout.interface;
 
     // Child Process Handling
     var child = std.process.Child.init(&[_][]const u8{ "cava", "-p", config_path }, alloc);
@@ -32,6 +35,12 @@ pub fn main() !void {
         const bytes_read = child_stdout_reader_interface.readSliceShort(&child_output_buffer) catch break;
 
         std.debug.print("{} bytes read\n", .{bytes_read});
+
+        for (child_output_buffer) |char| {
+            try stdout_writer.print("{s}", .{lib.byte_to_block(char)});
+        }
+        try stdout_writer.print("\n", .{});
+        try stdout_writer.flush();
     }
 
     _ = try child.wait();
