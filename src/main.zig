@@ -8,6 +8,8 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Configuration
+    // TODO: allow configuration via cli args
+    // TODO: proper tempfile configuration
     const width: usize = 20;
     // const framerate = 60;
     const config_path = "config";
