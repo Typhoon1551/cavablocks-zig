@@ -8,9 +8,15 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Configuration
-    // TODO: allow configuration via cli args
-    const width: usize = 20;
-    const framerate = 60;
+    const args = try std.process.argsAlloc(alloc);
+    defer std.process.argsFree(alloc, args);
+
+    if (args.len < 3) {
+        std.debug.print("Usage: cavablocks <width> <framerate>", .{});
+    }
+
+    const width = try std.fmt.parseInt(usize, args[1], 10);
+    const framerate = try std.fmt.parseInt(u16, args[2], 10);
 
     // Temp file
     var config = try temp.create_file(alloc, "config-*");
@@ -57,13 +63,14 @@ pub fn main() !void {
     try child.spawn();
 
     var child_reader_buffer: [4096]u8 = undefined;
-    var child_output_buffer: [width]u8 = undefined;
+    const child_output_buffer: []u8 = try alloc.alloc(u8, width);
+    defer alloc.free(child_output_buffer);
 
     var child_stdout_reader = child.stdout.?.reader(&child_reader_buffer);
     const child_stdout_reader_interface = &child_stdout_reader.interface;
 
     while (true) {
-        const bytes_read = child_stdout_reader_interface.readSliceShort(&child_output_buffer) catch break;
+        const bytes_read = child_stdout_reader_interface.readSliceShort(child_output_buffer) catch break;
 
         // std.debug.print("{} bytes read\n", .{bytes_read});
         _ = bytes_read;
