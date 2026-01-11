@@ -1,5 +1,5 @@
 const std = @import("std");
-const lib = @import("cavablocks_zig");
+const temp = @import("temp");
 
 pub fn main() !void {
     // Memory Allocator
@@ -9,10 +9,39 @@ pub fn main() !void {
 
     // Configuration
     // TODO: allow configuration via cli args
-    // TODO: proper tempfile configuration
     const width: usize = 20;
-    // const framerate = 60;
-    const config_path = "config";
+    const framerate = 60;
+
+    // Temp file
+    var config = try temp.create_file(alloc, "config-*");
+    defer config.deinit();
+
+    var config_file = try config.open(.{ .mode = .write_only });
+
+    var config_buffer: [256]u8 = undefined;
+    var config_file_writer = config_file.writer(&config_buffer);
+    const config_file_interface = &config_file_writer.interface;
+    try config_file_interface.print(
+        \\[general]
+        \\framerate = {}
+        \\bars = {}
+        \\[output]
+        \\method = raw
+        \\data_format = binary
+        \\bit_format = 8bit
+        \\channels = mono
+    , .{
+        framerate,
+        width,
+    });
+    try config_file_interface.flush();
+
+    const config_path = try config.parent_dir.realpathAlloc(alloc, config.basename);
+    defer alloc.free(config_path);
+
+    std.debug.print("{s}", .{config_path});
+
+    config_file.close();
 
     // Stdout
     var stdout_buffer: [256]u8 = undefined;
@@ -36,14 +65,29 @@ pub fn main() !void {
     while (true) {
         const bytes_read = child_stdout_reader_interface.readSliceShort(&child_output_buffer) catch break;
 
-        std.debug.print("{} bytes read\n", .{bytes_read});
+        // std.debug.print("{} bytes read\n", .{bytes_read});
+        _ = bytes_read;
 
         for (child_output_buffer) |char| {
-            try stdout_writer.print("{s}", .{lib.byte_to_block(char)});
+            try stdout_writer.print("{s}", .{byte_to_block(char)});
         }
         try stdout_writer.print("\n", .{});
         try stdout_writer.flush();
     }
 
     _ = try child.wait();
+}
+
+/// Function to convert bytes emitted by Cava to ASCII bock chars
+pub fn byte_to_block(byte: u8) *const [3:0]u8 {
+    return switch (byte) {
+        0...31 => "▁",
+        32...63 => "▂",
+        64...95 => "▃",
+        96...127 => "▄",
+        128...159 => "▅",
+        160...191 => "▆",
+        192...223 => "▇",
+        224...255 => "█",
+    };
 }
